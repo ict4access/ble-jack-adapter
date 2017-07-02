@@ -17,6 +17,13 @@
   Note that not all devices support BLE keyboard! BLE Keyboard != Bluetooth Keyboard
 */
 
+/*
+  Orginal Adafruit example was modified by 'ict4access' in order to set up
+  a bluetooth adapter for 4 switch input as buttons for iOS (Switch Control) and Android (Switch Access)
+  
+  For issues and questions contact ict4access@gmail.com
+*/
+
 #include <Arduino.h>
 #include <SPI.h>
 #if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined(ARDUINO_ARCH_SAMD)
@@ -76,11 +83,28 @@ Adafruit_BluefruitLE_UART ble(bluefruitSS, BLUEFRUIT_UART_MODE_PIN,
 /* ...hardware SPI, using SCK/MOSI/MISO hardware SPI pins and then user selected CS/IRQ/RST */
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
-/* ...software SPI, using SCK/MOSI/MISO user-defined SPI pins and then user selected CS/IRQ/RST */
-//Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_SCK, BLUEFRUIT_SPI_MISO,
-//                             BLUEFRUIT_SPI_MOSI, BLUEFRUIT_SPI_CS,
-//                             BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+/* ...software SPI, using SCK/MOSI/MISO user-defined SPI pins and then user selected CS/IRQ/RST 
+Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_SCK, BLUEFRUIT_SPI_MISO,
+                             BLUEFRUIT_SPI_MOSI, BLUEFRUIT_SPI_CS,
+                             BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);  */
 
+
+//the character we want to type, for 4 buttons -> 4 keys
+ char myKey5 = 'A';
+ char myKey6 = 'B';
+ char myKey10 = 'C';
+ char myKey11 = 'D';
+
+ // saving the state of the push button, default is high
+ int buttonState5 = 1;
+ int buttonState6 = 1;
+ int buttonState10 = 1;
+ int buttonState11 = 1;
+
+ // time for avoinding noise
+ int timeNoise = 10;
+
+ 
 // A small helper
 void error(const __FlashStringHelper*err) {
   Serial.println(err);
@@ -100,7 +124,8 @@ void setup(void)
   pinMode(10, INPUT_PULLUP);
   pinMode(11, INPUT_PULLUP);
 
-  while (!Serial);  // required for Flora & Micro
+  //disabled for working wireless
+  //while (!Serial);  // required for Flora & Micro
   delay(500);
 
   Serial.begin(115200);
@@ -165,6 +190,35 @@ void setup(void)
   Serial.println();
 }
 
+int simulateSwitch(int pinNumber, char keyPressed, int buttonState){
+  //wait
+    delay(timeNoise);
+    //read it again
+ 
+    //still different
+    if(buttonState != digitalRead(pinNumber))
+    {
+      Serial.println("Stable state");
+ 
+      //save on the buttonState variable
+      buttonState = digitalRead(pinNumber);
+ 
+      if(buttonState == LOW)
+      {
+         ble.print("AT+BleKeyboard=");
+         ble.println(keyPressed);
+      }
+      if(buttonState == HIGH)
+      {
+        //Keyboard.release(keyPressed);
+        Serial.println("button released");
+        ble.flush();
+      }
+    }
+    
+    return buttonState;
+}
+
 /**************************************************************************/
 /*!
     @brief  Constantly poll for new command or response data
@@ -172,25 +226,25 @@ void setup(void)
 /**************************************************************************/
 void loop(void)
 {
-  // Display prompt
-  Serial.print(F("keyboard > "));
-
-  // Check for user input and echo it back if anything was found
-  char keys[BUFSIZE+1];
-  getUserInput(keys, BUFSIZE);
-
-  Serial.print("\nSending ");
-  Serial.println(keys);
-
-  ble.print("AT+BleKeyboard=");
-  ble.println(keys);
-
-  if( ble.waitForOK() )
+  //something changed on button5
+  if(buttonState5 != digitalRead(5))
   {
-    Serial.println( F("OK!") );
-  }else
+    buttonState5 = simulateSwitch(5, myKey5, buttonState5);
+  }
+ 
+  if(buttonState6 != digitalRead(6))
   {
-    Serial.println( F("FAILED!") );
+    buttonState6 = simulateSwitch(6, myKey6, buttonState6);
+  }
+
+  if(buttonState10 != digitalRead(10))
+  {
+    buttonState10 = simulateSwitch(10, myKey10, buttonState10);
+  }
+
+  if(buttonState11 != digitalRead(11))
+  {
+    buttonState11 = simulateSwitch(11, myKey11, buttonState11);
   }
 }
 
